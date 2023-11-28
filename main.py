@@ -33,7 +33,7 @@ def detectCircles(frame, minRadius=0, maxRadius=0):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray = cv2.medianBlur(gray, 5)
     circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1, 20,
-                               param1=50, param2=25, minRadius=minRadius, maxRadius=maxRadius)
+                               param1=50, param2=30, minRadius=minRadius, maxRadius=maxRadius)
     if circles is None:
         return
 
@@ -76,7 +76,7 @@ def detectCollision(rawCircles, game, frame):
             bgY = bg[1]
             bgR = bg[2]
             dist = sqrt((fgX - bgX) ** 2 + (fgY - bgY) ** 2)
-            if dist < (bgR):
+            if dist < (bgR + fgR / 2):
                 collided = np.append(collided, [[fgX, fgY]], axis=0)
     # print(collided)
     return collided

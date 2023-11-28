@@ -19,21 +19,28 @@ class BaloonsGame:
 
         self.baloons = []
         self.baloonsCount = 6
+        self.generator = Baloon.getNextPos(
+            self.screen.get_height(), self.screen.get_width(), 50)
         self._generateBaloons()
 
         self.debugInfo = {}
         self.score = 0
 
         # Timer for a game
-        self.timer = 120  # time in seconds
-        pygame.time.set_timer(pygame.USEREVENT, 1000)
+        self.timer = 40  # time in seconds
+        self.timerEvent = pygame.USEREVENT + 0
+        self.generationEvent = pygame.USEREVENT + 1
+        pygame.time.set_timer(self.timerEvent, 1000)
+        pygame.time.set_timer(self.generationEvent, 3000)
 
     def run(self):
         for event in pygame.event.get():
-            if event.type == pygame.USEREVENT and self.timer > 0:
+            if event.type == self.timerEvent and self.timer > 0:
                 self.timer -= 1
                 if self.timer <= 0:
                     self.state = GameStates.GAME_OVER
+            if event.type == self.generationEvent:
+                self._generateBaloons(1)
 
             if event.type == pygame.MOUSEBUTTONDOWN:
                 pos = pygame.mouse.get_pos()
@@ -49,7 +56,7 @@ class BaloonsGame:
             self._writeTime()
 
             self._writeScore()
-        else:
+        elif self.state == GameStates.GAME_OVER:
             self.screen.fill((255, 255, 255))
             # self._drawBaloons()
             # self._writeTime()
@@ -61,10 +68,9 @@ class BaloonsGame:
 
         self.clock.tick(60)
 
-    def _generateBaloons(self, num=3):
-        # TODO: generate separate
+    def _generateBaloons(self, num=1):
         for i in range(num):
-            b = Baloon.generate(self.screen)
+            b = Baloon.generate(self.generator)
             self.baloons.append(b)
 
     def _drawBaloons(self):
@@ -74,10 +80,8 @@ class BaloonsGame:
     def _updateBaloons(self):
         for b in self.baloons:
             b.update(self.clock.get_time())
-            if b.pos.y < -b.size:
+            if b.pos.y < -b.size * 2:
                 self.baloons.remove(b)
-        if len(self.baloons) < self.baloonsCount:
-            self._generateBaloons(self.baloonsCount - len(self.baloons))
 
         self.clock.tick(60)
 
@@ -139,8 +143,11 @@ class BaloonsGame:
         return cnt
 
 
-class Baloon:
+class Baloon(pygame.sprite.Sprite):
     def __init__(self, x, y, size):
+        super(Baloon, self).__init__()
+        self.surf = pygame.image.load('assets/balloon.png').convert_alpha()
+        self.rect = self.surf.get_rect()
         self.pos = pygame.Vector2(x, y)
         self.velocity = pygame.Vector2(0, -2)
         self.acceleration = pygame.Vector2(0, 0)
@@ -148,23 +155,58 @@ class Baloon:
         self.timePassed = 0
         self.color = (0, 0, 255)
 
+        self.surf = pygame.transform.scale(
+            self.surf, (size * 2, size * 2 + 0.8 * size))
+        self.rect.update(self.pos.x - self.size,
+                         self.pos.y - self.size, self.size * 2, self.size * 2)
+
     def update(self, dt):
-        # self.timePassed = self.timePassed + dt
-        # self.acceleration.x = math.sin(self.timePassed) / 5
-        self.velocity = self.velocity + self.acceleration
+        self.timePassed = self.timePassed + dt * 100
+        # self.acceleration.x = math.cos(self.timePassed)
+        # self.velocity = self.velocity + self.acceleration
+        # print(self.velocity)
         # print(self.acceleration, self.velocity)
         self.pos = self.pos + self.velocity
 
     def draw(self, surf):
-        pygame.draw.circle(surf, self.color, self.pos, self.size)
+        self.rect.move_ip(self.velocity.x, self.velocity.y)
+        surf.blit(self.surf, self.rect, )
+        # pygame.draw.circle(surf, self.color, self.pos, self.size, 2)
 
-    def generate(surf):
+    def generate(gen):
         size = 50
-        offset = 10
-        x = random.randint(size + offset, surf.get_width() - size - offset)
-        randOffsetY = random.randint(0, surf.get_height() * 2)
-        y = surf.get_height() + size + randOffsetY
+        x, y = next(gen)
         return Baloon(x, y, size)
+
+    def getNextPos(screenHeight, screenWidth, size):
+        offset = 15
+        rows = int(screenHeight / (size * 2 + offset))
+        cols = int(screenWidth / (size * 2 + offset))
+        randXs = Baloon._randomSequence(cols)
+        randYs = Baloon._randomSequence(rows)
+        fieldHeight = int(screenHeight / rows)
+        fieldWidth = int(screenWidth / cols)
+        while True:
+            if len(randXs) == 0:
+                randXs = Baloon._randomSequence(cols)
+            if len(randYs) == 0:
+                randYs = Baloon._randomSequence(rows)
+            y = randYs.pop()
+            x = randXs.pop()
+            randFieldY = (fieldHeight * y + size,
+                          fieldHeight * (y + 1) - size)
+            randFieldX = (fieldWidth * x + size,
+                          fieldWidth * (x + 1) - size)
+            outX = random.randint(randFieldX[0], randFieldX[1])
+
+            # outY = screenHeight + random.randint(randFieldY[0], randFieldY[1])
+            outY = screenHeight + size * 2 + 30
+            yield outX, outY
+
+    def _randomSequence(maxNum):
+        randList = [*range(maxNum)]
+        random.shuffle(randList)
+        return randList
 
     def changeColor(self, color):
         self.color = color
