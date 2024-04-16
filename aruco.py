@@ -37,7 +37,6 @@ class ArucoUtils:
         self._detectMarkers(image)
         if type(self.detectedMarkers["Ids"]) == np.ndarray and len(self.detectedMarkers["Ids"]) == len(self.ids):
             allCorners = self.detectedMarkers["Corners"]
-            print(allCorners)
             return np.array([allCorners[0][0][0], allCorners[3][0][3], allCorners[2][0][2], allCorners[1][0][1]])
         return None
 

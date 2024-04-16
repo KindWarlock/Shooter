@@ -9,8 +9,8 @@ import config
 
 
 def openCam():
-    # url = "http://192.168.43.1:8080/video"
-    url = "/dev/video2"
+    url = "http://192.168.1.39:8080/video"
+    # url = "/dev/video2"
     _cap = cv2.VideoCapture(url)
     print(_cap.get(cv2.CAP_PROP_FPS))
     if (_cap.isOpened() == False):
@@ -24,8 +24,8 @@ def getTestAruco():
     _image = np.empty((480, 640, 3), dtype='uint8')
     _image.fill(255)
     _arucoUtils.placeMarkers(_image)
-    cv2.imshow("Markers", _image)
-    cv2.moveWindow('Markers', 2220, 0)
+    cv2.imshow("Game", _image)
+    # cv2.moveWindow('Markers', 2220, 0)
     return _arucoUtils, _image
 
 
@@ -33,7 +33,7 @@ def detectCircles(frame, minRadius=0, maxRadius=0):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray = cv2.medianBlur(gray, 5)
     circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1, 20,
-                               param1=50, param2=30, minRadius=minRadius, maxRadius=maxRadius)
+                               param1=50, param2=25, minRadius=minRadius, maxRadius=maxRadius)
     if circles is None:
         return
 
@@ -90,10 +90,31 @@ def detectStop(currPos, prevPos):
     return False
 
 
+def getColorMask(frame):
+    yellow = [[20, 30, 30], [35, 255, 255]]
+    green = [[40, 30, 30], [75, 255, 255]]
+
+    # Красный присутствует на обеих границах
+    red_low = [[0, 30, 30], [15, 255, 255]]
+    red_high = [[160, 30, 30], [179, 255, 255]]
+    blue = [[80, 30, 30], [130, 255, 255]]
+
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    mask_yellow = cv2.inRange(hsv, yellow[0], yellow[1])
+    mask_red = cv2.bitwise_or(cv2.inRange(
+        hsv, red_low[0], red_low[1]), cv2.inRange(hsv, red_high[0], red_high[1]))
+    mask_blue = cv2.inRange(hsv, blue[0], blue[1])
+    mask_green = cv2.inRange(hsv, green[0], green[1])
+    return mask_yellow, mask_red, mask_blue, mask_green
+
+
 def getWarpMatrix(frame, markersImage):
     corners = arucoUtils.detectCorners(frame)
     arucoUtils.outlineMarkers(frame)
     warpMatrix = None
+
+    cv2.imshow('Frame', frame)
+
     if type(corners) == np.ndarray:
         # x, y format
         out = np.float32([[0, 0],
@@ -122,7 +143,7 @@ def runGame(frame, prevPos):
     gameImage = cv2.warpPerspective(
         frame, warpMatrix, (640, 480))
     circles = detectCircles(
-        gameImage, minRadius=10, maxRadius=game.baloons[0].size + 10)
+        gameImage, minRadius=17, maxRadius=game.baloons[0].size + 10)
     minVal = 0
 
     if type(circles) == np.ndarray:
@@ -143,9 +164,9 @@ def runGame(frame, prevPos):
             #         break
 
     imgdata = pygame.surfarray.array3d(game.screen).swapaxes(0, 1)
-    cv2.imshow('Markers', imgdata)
+    cv2.imshow('Game', imgdata)
 
-    cv2.imshow('Game', gameImage)
+    cv2.imshow('Game (Camera)', gameImage)
     return prevPos, minVal
     # return prevNumber
 
@@ -204,17 +225,23 @@ state = 0
 while (cap.isOpened()):
     ret, frame = cap.read()
     if ret:
-        # frame = cv2.resize(
-        #     frame, (frame.shape[1] // resize_scale, frame.shape[0] // resize_scale))
-        # frame = cv2.undistort(frame, mtx, dist, None)
+        frame = cv2.resize(
+            frame, (frame.shape[1] // resize_scale, frame.shape[0] // resize_scale))
+        # frame = cv2.undistort(rawframe, config.mtx, config.dist, None)
 
         if state == 0:
             result = getWarpMatrix(frame, markersImage)
             if result is not None:
                 warpMatrix = result
+                cv2.imshow('Original', frame)
+
+                frame = cv2.warpPerspective(
+                    frame, warpMatrix, (640, 480))
+                cv2.imshow('Warped', frame)
                 state = 1
 
         elif state == 1:
+            cv2.imshow('Raw', frame)
             prevPos, dist = runGame(frame, prevPos)
             if dist > 1 and dist < 20:
                 data.append(dist)
