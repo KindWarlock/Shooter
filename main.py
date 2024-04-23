@@ -131,8 +131,8 @@ def getWarpMatrix(frame, markersImage):
 
 def findMinDist(collided, prevPos):
     dists = np.linalg.norm(collided - prevPos, axis=1)
-    print('prevPos: ', prevPos, ', collided: ',
-          collided, ', minDist: ',  dists)
+    # print('prevPos: ', prevPos, ', collided: ',
+    #   collided, ', minDist: ',  dists)
     return np.min(dists), np.argmin(dists)
     # return minDist
 
@@ -155,7 +155,6 @@ def runGame(frame, prevPos):
             prevPos = collided[minIdx]
             # print(minVal)
             if minVal < 17.5:
-                print('Hit!')
                 game.popBaloon(prevPos)
                 prevPos[:] = 0
             # for currPos in collided:
@@ -193,6 +192,24 @@ def compareBaloons(frame, game, circles):
         cv2.circle(frame, (int(b.pos.x), int(b.pos.y)), 1, (0, 0, 0), 2)
         game.popBaloon([b.pos.x, b.pos.y])
     game.updateDebug('Ballons: ', baloonPos)
+
+
+def preprocess(frame):
+    rgb_planes = cv2.split(frame)
+
+    result_planes = []
+    result_norm_planes = []
+    for plane in rgb_planes:
+        dilated_img = cv2.dilate(plane, np.ones((7, 7), np.uint8))
+        bg_img = cv2.medianBlur(dilated_img, 21)
+        diff_img = 255 - cv2.absdiff(plane, bg_img)
+        norm_img = cv2.normalize(
+            diff_img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+        result_planes.append(diff_img)
+        result_norm_planes.append(norm_img)
+
+    result_norm = cv2.merge(result_norm_planes)
+    return result_norm
 
 
 gameImage = []
@@ -241,7 +258,9 @@ while (cap.isOpened()):
                 state = 1
 
         elif state == 1:
+            frame = preprocess(frame)
             cv2.imshow('Raw', frame)
+
             prevPos, dist = runGame(frame, prevPos)
             if dist > 1 and dist < 20:
                 data.append(dist)
